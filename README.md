@@ -6,6 +6,14 @@ Every in-game day has three acts: a **Morning** action (visit the realtor, hire 
 
 ---
 
+## Play Online
+
+The latest build is deployed to GitHub Pages — no installation required:
+
+**https://jsmitsarthrex.github.io/hoard-and-holdings/**
+
+---
+
 ## Setup
 
 ```bash
