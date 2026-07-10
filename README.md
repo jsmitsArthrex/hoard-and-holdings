@@ -374,9 +374,9 @@ The Game Hub displays a live **Rumours** panel — context-aware flavour text ge
 Accessible via the gear icon at any time during play:
 
 - **Save** — Displays current dragon, day, and property count. Progress auto-saves with every action (Zustand persist → localStorage key `hoard-holdings-save`). The "Confirm Save" button provides a visual confirmation flash.
-- **Audio** — Mute toggle + volume slider (0–100%). Settings persist to localStorage keys `hoard-holdings-muted` and `hoard-holdings-volume`.
-- **Exit to Title** — Returns to the title screen without erasing progress.
 - **New Game** — Two-step confirmation to wipe the current run and start fresh.
+- **Back to Title** — Returns to the title screen without erasing progress.
+- **Sound** — Collapsible section with two independent sub-panels: **SFX** (mute toggle + volume slider; keys `hoard-holdings-muted` / `hoard-holdings-volume`) and **Music** (mute toggle + volume slider; keys `hoard-holdings-music-muted` / `hoard-holdings-music-volume`).
 
 ### Game Chronicle (bottom bar)
 
@@ -394,7 +394,9 @@ Displayed in the Game Hub below the action buttons. Shows the ability available 
 
 ## Audio
 
-All sound effects are synthesised at runtime using the **Web Audio API** — no external audio files are required.
+All sound and music is synthesised at runtime using the **Web Audio API** — no external audio files are required.
+
+### Sound Effects
 
 | Sound | Trigger |
 |---|---|
@@ -405,6 +407,21 @@ All sound effects are synthesised at runtime using the **Web Audio API** — no 
 | `koboldCheer` | Hiring a kobold |
 | `dragonRoar` | Age tier celebration events |
 | `alert` | Event modal appears |
+| `uiClick` | Button presses within modals |
+| `uiOpen` | Opening a modal or overlay |
+| `uiClose` | Closing a modal or overlay |
+
+### Music
+
+A procedural ambient music engine plays a continuously looping score with three context-aware tracks that crossfade when you move between areas:
+
+| Track | Context | Character |
+|---|---|---|
+| **Ambient** | Game Hub, exploration screens | A minor, 76 BPM, sustained sawtooth drone |
+| **Combat** | Hunt Adventurers screen | E minor, 112 BPM, driving off-beat bass hits, no drone |
+| **NPC** | Bank, Inn, Law Office, Rival screen | C major, 58 BPM, soft and conversational |
+
+Music volume and mute state are persisted separately from SFX to localStorage keys `hoard-holdings-music-muted` and `hoard-holdings-music-volume`.
 
 ---
 
