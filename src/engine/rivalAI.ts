@@ -6,6 +6,7 @@ export interface RivalAIResult {
   updatedRivalPropertyIds: Map<number, string[]>;
   poachedKoboldIds: string[];
   poachedKoboldsByRivalId: Map<number, KoboldEmployee>;
+  disputeToFile?: { rivalId: number; propertyId: string };
 }
 
 export function runRivalAI(
@@ -14,6 +15,7 @@ export function runRivalAI(
   kobolds: KoboldEmployee[],
   currentDay: number,
   aggressionMultiplier = 1.0,
+  hasActiveDispute = false,
 ): RivalAIResult {
   const allProperties = districts.flatMap(d => d.properties);
   const playerSet = new Set(playerPropertyIds);
@@ -62,5 +64,20 @@ export function runRivalAI(
     }
   });
 
-  return { rivalActions, updatedRivalPropertyIds, poachedKoboldIds, poachedKoboldsByRivalId };
+  let disputeToFile: RivalAIResult['disputeToFile'];
+  if (
+    !hasActiveDispute &&
+    playerPropertyIds.length >= 3 &&
+    rivals.length > 0
+  ) {
+    for (const rival of rivals) {
+      if (Math.random() < 0.10) {
+        const idx = Math.floor(Math.random() * playerPropertyIds.length);
+        disputeToFile = { rivalId: rival.id, propertyId: playerPropertyIds[idx] };
+        break;
+      }
+    }
+  }
+
+  return { rivalActions, updatedRivalPropertyIds, poachedKoboldIds, poachedKoboldsByRivalId, disputeToFile };
 }

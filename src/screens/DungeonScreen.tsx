@@ -180,7 +180,7 @@ export default function DungeonScreen() {
       const regenAmt = Math.floor((dragonMaxHP - finalHP) * 0.4);
       updateDragonHP(Math.min(dragonMaxHP, finalHP + regenAmt));
       setHealAmount(regenAmt);
-      logEvent(`Plundered the ${selectedTier.label}! Claimed ${item.name} and ${goldReward} gold.`);
+      logEvent(`Plundered the ${selectedTier.label}! Claimed ${item.name} and ${goldReward} gold.`, 'combat');
     } else {
       playSound('coinLoss');
       const penalty = 30 + Math.floor(Math.random() * 51);
@@ -189,7 +189,7 @@ export default function DungeonScreen() {
       const restoredHP = Math.floor(dragonMaxHP * 0.5);
       updateDragonHP(restoredHP);
       setHealAmount(restoredHP);
-      logEvent(`Driven back from the ${selectedTier.label}! Lost ${penalty} gold retreating.`);
+      logEvent(`Driven back from the ${selectedTier.label}! Lost ${penalty} gold retreating.`, 'combat');
     }
   }
 

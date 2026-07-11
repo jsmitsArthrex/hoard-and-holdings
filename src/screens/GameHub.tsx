@@ -7,6 +7,7 @@ import { playSound } from '../audio/audioEngine';
 import WorldMap from '../components/map/WorldMap';
 import { districts } from '../data/districts';
 import type { RivalEntry } from '../components/map/WorldMap';
+import type { GameState } from '../types';
 
 const INK = '#2C1810';
 const PARCHMENT = '#C4934A';
@@ -83,18 +84,20 @@ export default function GameHub() {
     useMorningAction, useAfternoonAction, setActiveScreen, advanceDay, logEvent,
     kobolds, gold, day,
     dread, hoardItems, activeIncursions, statusEffects, adventurersDefeated,
-    gameLog, dragon, gameSettings, activeRansom, blackMarketStock,
+    gameLog, dragon, gameSettings, activeRansom, blackMarketStock, hoardArrangement,
+  activeWantedPoster, festival, enterAerialDisplay,
   } = useGameStore();
 
   const hasBlackMarketStock = (blackMarketStock ?? []).some(i => !i.purchased);
 
   const [popup, setPopup] = useState<PropertyPopup | null>(null);
   const [rumoursOpen, setRumoursOpen] = useState(false);
+  const [posterOpen, setPosterOpen] = useState(false);
 
   const rumours = generateRumours({
     dragon, dread, kobolds, hoardItems, rivals, activeIncursions,
     statusEffects, playerPropertyIds, adventurersDefeated, gold, day,
-    gameLog, gameSettings,
+    gameLog, gameSettings, hoardArrangement,
   });
 
   const rivalEntries: RivalEntry[] = rivals.map(r => ({
@@ -184,6 +187,32 @@ export default function GameHub() {
         {timeOfDay !== 'evening' ? (
           <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+            {/* ── Festival Banner ── */}
+            {festival?.active && (
+              <div style={{
+                background: 'linear-gradient(135deg, #7A4400, #C9A22780, #7A4400)',
+                border: `2px solid ${GOLD}`,
+                borderRadius: 6,
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}>
+                <span style={{ fontSize: 22, flexShrink: 0 }}>🎪</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: '"Cinzel", serif', fontWeight: 700, color: GOLD, fontSize: 15, letterSpacing: '0.05em' }}>
+                    GRAND DRAGON FESTIVAL
+                  </div>
+                  <div style={{ fontSize: 13, color: '#C4934A99' }}>
+                    Day {day} — Ends Day {festival.endsOnDay}
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: '#C4934A70', textAlign: 'right' }}>
+                  {festival.aerialDisplayUsed ? '🐉 Display done' : '🐉 Display available'}
+                </div>
+              </div>
+            )}
+
             {/* ── Economy ticker ── */}
             <div style={{
               background: '#2C181020', border: `1px solid ${PARCHMENT}30`,
@@ -260,6 +289,37 @@ export default function GameHub() {
                   🌅 MORNING
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {festival?.active && !festival.aerialDisplayUsed && !morningActionUsed && (
+                    <button
+                      onClick={() => { playSound('dragonRoar'); enterAerialDisplay(); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                        background: `linear-gradient(135deg, #3A1A00, #C9A22715)`,
+                        border: `2px solid ${GOLD}`,
+                        borderRadius: 6, cursor: 'pointer', width: '100%', textAlign: 'left',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{ fontSize: 24, flexShrink: 0 }}>🐉</span>
+                      <div>
+                        <div style={{ fontFamily: '"Cinzel", serif', fontWeight: 700, color: GOLD, fontSize: 18, lineHeight: 1.2 }}>
+                          Enter Aerial Display
+                        </div>
+                        <div style={{ fontSize: 16, color: '#C4934A80' }}>
+                          Prestige combat — the realm watches
+                        </div>
+                      </div>
+                    </button>
+                  )}
+                  {festival?.active && festival.aerialDisplayUsed && (
+                    <div style={{
+                      padding: '8px 14px',
+                      background: '#2C181020', border: `1px dashed ${GOLD}40`,
+                      borderRadius: 6, fontSize: 15, color: `${GOLD}60`,
+                    }}>
+                      ✓ Aerial Display complete for this festival
+                    </div>
+                  )}
                   {MORNING_ACTIONS.map(btn => (
                     <ActionButton
                       key={btn.screen}
@@ -320,6 +380,69 @@ export default function GameHub() {
                     </button>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* ── Festival Rival Challenge Card ── */}
+            {festival?.active && festival.rivalChallengePropertyId && (() => {
+              const allProps = districts.flatMap(d => d.properties);
+              const challengeProp = allProps.find(p => p.id === festival.rivalChallengePropertyId);
+              const challengeRival = rivals.find(r => r.id === festival.rivalChallengeRivalId);
+              const winner = festival.rivalChallengeWinner;
+              const statusColor = winner === 'player' ? '#4ACC7A' : winner === 'rival' ? '#CC4444' : GOLD;
+              const statusText = winner === 'player'
+                ? '👑 You secured it!'
+                : winner === 'rival'
+                  ? `⚔️ ${challengeRival?.name ?? 'Rival'} won`
+                  : '⏳ Race ongoing';
+              return (
+                <div style={{
+                  background: '#2C181030',
+                  border: `1px solid ${GOLD}50`,
+                  borderRadius: 6,
+                  padding: '10px 14px',
+                }}>
+                  <div style={{
+                    fontFamily: '"Cinzel", serif', fontWeight: 700,
+                    color: GOLD, fontSize: 13, letterSpacing: '0.04em', marginBottom: 6,
+                  }}>
+                    🎪 PROPERTY RACE CHALLENGE
+                  </div>
+                  <div style={{ fontSize: 14, color: PARCHMENT, marginBottom: 3 }}>
+                    <strong>{challengeProp?.name ?? festival.rivalChallengePropertyId}</strong>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#C4934A80', marginBottom: 4 }}>
+                    vs. {challengeRival?.name ?? 'Unknown Rival'}
+                  </div>
+                  <div style={{ fontSize: 13, color: statusColor, fontWeight: 700 }}>
+                    {statusText}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── Wanted Poster Badge ── */}
+            {activeWantedPoster && (
+              <div>
+                <button
+                  onClick={() => { playSound('uiOpen'); setPosterOpen(true); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '10px 14px',
+                    background: '#8B1A1A20', border: '1px solid #CC444460',
+                    borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: 20 }}>📜</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: '"Cinzel", serif', fontWeight: 700, color: '#CC4444', fontSize: 15, lineHeight: 1.2 }}>
+                      WANTED POSTER ACTIVE
+                    </div>
+                    <div style={{ fontSize: 13, color: '#CC444480', marginTop: 1 }}>
+                      {activeWantedPoster.bounty}g bounty — tap to view
+                    </div>
+                  </div>
+                </button>
               </div>
             )}
 
@@ -473,6 +596,14 @@ export default function GameHub() {
         )}
       </div>
 
+      {/* ── Wanted Poster Modal ── */}
+      {posterOpen && activeWantedPoster && (
+        <WantedPosterModal
+          poster={activeWantedPoster}
+          onClose={() => { playSound('uiClose'); setPosterOpen(false); }}
+        />
+      )}
+
       {/* ── Property Popup ── */}
       {popup && popupProp && popupDist && (
         <div
@@ -579,6 +710,136 @@ function Row({ label, value, color, bold }: { label: string; value: string; colo
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: bold ? 14 : 13 }}>
       <span style={{ color: '#C4934A99' }}>{label}</span>
       <span style={{ color, fontWeight: bold ? 700 : 400 }}>{value}</span>
+    </div>
+  );
+}
+
+type WantedPoster = NonNullable<GameState['activeWantedPoster']>;
+
+function WantedPosterModal({ poster, onClose }: { poster: WantedPoster; onClose: () => void }) {
+  const THREAT_COLORS: Record<string, string> = {
+    'DANGEROUS': '#CC2222',
+    'EXTREMELY DANGEROUS': '#8B0000',
+    'DO NOT APPROACH UNDER ANY CIRCUMSTANCES': '#4A0000',
+  };
+  const badgeColor = THREAT_COLORS[poster.threatLevel] ?? '#CC2222';
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: '#00000080',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 300,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'linear-gradient(170deg, #F4E4B0, #EBDA96, #E0CE80)',
+          border: '4px solid #5A3A1A',
+          borderRadius: '3px 5px 4px 3px',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.85), inset 0 0 80px rgba(90,58,26,0.1)',
+          padding: '28px 32px',
+          maxWidth: 420, width: '90%',
+          maxHeight: '90vh', overflowY: 'auto',
+          color: '#3A2A1A',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{
+          fontFamily: '"Cinzel", serif', fontWeight: 900, fontSize: 54,
+          textAlign: 'center', letterSpacing: '0.12em', color: '#3A2A1A',
+          lineHeight: 1, marginBottom: 6,
+          textShadow: '1px 2px 0 rgba(90,58,26,0.25)',
+        }}>
+          WANTED
+        </div>
+
+        {/* Name plate */}
+        <div style={{
+          borderTop: '2px solid #5A3A1A', borderBottom: '2px solid #5A3A1A',
+          textAlign: 'center', padding: '8px 0', marginBottom: 14,
+        }}>
+          <div style={{ fontFamily: '"Cinzel", serif', fontSize: 22, fontWeight: 700, color: '#3A2A1A' }}>
+            {poster.dragonName}
+          </div>
+          <div style={{ fontFamily: '"Crimson Text", serif', fontSize: 15, color: '#5A3A1A', fontStyle: 'italic', marginTop: 2 }}>
+            Known Dragon. Extremely Bad-Tempered.
+          </div>
+        </div>
+
+        {/* Threat badge */}
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+          <span style={{
+            background: badgeColor, color: '#F5F0E8',
+            fontFamily: '"Cinzel", serif', fontWeight: 700,
+            fontSize: poster.threatLevel.length > 20 ? 11 : 13,
+            padding: '5px 14px', borderRadius: 3, letterSpacing: '0.06em',
+            display: 'inline-block', lineHeight: 1.4,
+          }}>
+            ⚠ {poster.threatLevel}
+          </span>
+        </div>
+
+        {/* Crimes */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{
+            fontFamily: '"Cinzel", serif', fontSize: 13, fontWeight: 700,
+            color: '#3A2A1A', marginBottom: 8, letterSpacing: '0.04em',
+          }}>
+            For crimes including:
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {poster.crimes.map((crime, i) => (
+              <li key={i} style={{ fontFamily: '"Crimson Text", serif', fontSize: 17, color: '#3A2A1A', lineHeight: 1.45 }}>
+                {crime}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Reward */}
+        <div style={{
+          borderTop: '1px solid #5A3A1A80', paddingTop: 14,
+          marginBottom: 16, textAlign: 'center',
+        }}>
+          <div style={{ fontFamily: '"Crimson Text", serif', fontSize: 15, color: '#5A3A1A', marginBottom: 2 }}>
+            Reward offered by the
+          </div>
+          <div style={{ fontFamily: '"Cinzel", serif', fontSize: 15, fontWeight: 700, color: '#3A2A1A', marginBottom: 8 }}>
+            {poster.districtName} Adventurers' Guild
+          </div>
+          <div style={{ fontFamily: '"Cinzel", serif', fontSize: 36, fontWeight: 900, color: '#8B1A1A', letterSpacing: '0.04em' }}>
+            🪙 {poster.bounty}g
+          </div>
+        </div>
+
+        {/* Footer disclaimer */}
+        <div style={{ borderTop: '1px solid #5A3A1A40', paddingTop: 10, marginBottom: 16 }}>
+          <div style={{
+            fontFamily: '"Crimson Text", serif', fontSize: 13,
+            color: '#5A3A1A80', fontStyle: 'italic', textAlign: 'center', lineHeight: 1.55,
+          }}>
+            Guild assumes no liability for any dragon-related injuries<br />
+            sustained during apprehension attempts.
+          </div>
+        </div>
+
+        {/* Close */}
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '10px',
+            background: '#5A3A1A', color: '#F4E4B0',
+            border: '2px solid #3A2A1A', borderRadius: 4,
+            fontFamily: '"Cinzel", serif', fontWeight: 700, fontSize: 16,
+            cursor: 'pointer',
+          }}
+        >
+          Note Taken. Flee Accordingly.
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, MapPin, Skull, Zap } from 'lucide-react';
 import NPCPortrait from '../components/npcs/NPCPortrait';
 import { useGameStore } from '../store/gameStore';
@@ -7,6 +7,7 @@ import ContractCard from '../components/ui/ContractCard';
 import { districts } from '../data/districts';
 import type { Property } from '../data/districts';
 import { PROPERTY_UPGRADES } from '../data/propertyUpgrades';
+import { getModifier } from '../engine/statusEffects';
 
 const INK = '#2C1810';
 const PARCHMENT = '#C4934A';
@@ -37,8 +38,10 @@ function getOwnerLabel(propId: string, playerIds: string[], rivals: { name: stri
 }
 
 export default function RealEstateScreen() {
-  const { gold, playerPropertyIds, rivals, highlightedPropertyId, activeContracts, day, buyProperty, setActiveScreen, logEvent, activePropertyAuction, placeBid, resolvePropertyAuction, propertyUpgrades, buildPropertyUpgrade, playerPropertyAcquiredDays, statusEffects } = useGameStore();
+  const { gold, playerPropertyIds, rivals, highlightedPropertyId, activeContracts, day, buyProperty, setActiveScreen, logEvent, activePropertyAuction, placeBid, resolvePropertyAuction, propertyUpgrades, buildPropertyUpgrade, playerPropertyAcquiredDays, statusEffects, auctionLockoutUntilDay, attemptAuctionBluff } = useGameStore();
   const isFrozen = statusEffects.some(e => e.affectedStat === 'propertyFreeze');
+  const buyMarkup = getModifier(statusEffects, 'propertyBuyPriceModifier');
+  const hasLoanDefault = buyMarkup > 0;
 
   const grixleContract = (activeContracts ?? []).find(c => c.npcId === 'grixle' && !c.completed && !c.failed);
   const [dialogueLine, setDialogueLine] = useState(REALTOR_LINES[Math.floor(Math.random() * REALTOR_LINES.length)]);
@@ -47,7 +50,26 @@ export default function RealEstateScreen() {
   const [searchFilter, setSearchFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [bidInput, setBidInput] = useState<number>(0);
+  const [showBluffPicker, setShowBluffPicker] = useState(false);
+  const [bluffPendingAmount, setBluffPendingAmount] = useState<number | null>(null);
+  const bluffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const PAGE_SIZE = 10;
+
+  const isAuctionLockedOut = auctionLockoutUntilDay > day;
+  const lockoutDaysLeft = auctionLockoutUntilDay - day;
+
+  useEffect(() => {
+    return () => { if (bluffTimerRef.current) clearTimeout(bluffTimerRef.current); };
+  }, []);
+
+  const handleBluffSelect = (amount: number) => {
+    setBluffPendingAmount(amount);
+    setShowBluffPicker(false);
+    bluffTimerRef.current = setTimeout(() => {
+      attemptAuctionBluff(amount);
+      setBluffPendingAmount(null);
+    }, 500);
+  };
 
   const allProperties = districts.flatMap(d =>
     d.properties.map(p => ({ ...p, districtName: d.name }))
@@ -76,6 +98,8 @@ export default function RealEstateScreen() {
     { text: "Any hidden gems?", response: "The Cursed Wastes properties are dirt cheap. The dirt there is cursed, but still. Excellent value!" },
     { text: "How's the market?", response: "Volatile. Between adventurer incursions and rival dragon acquisitions, prices fluctuate wildly. Buy now!" },
   ];
+
+  const effectivePrice = (basePrice: number) => Math.round(basePrice * (1 + buyMarkup));
 
   const handleOffer = (prop: Property) => {
     setDialogueLine(OFFER_LINES[Math.floor(Math.random() * OFFER_LINES.length)]);
@@ -164,7 +188,12 @@ export default function RealEstateScreen() {
               Confirm Purchase
             </div>
             <div style={{ fontSize: 18, color: '#E8D5A0', marginBottom: 10 }}>
-              {confirmProp.name} · {confirmProp.goldPrice} gold
+              {confirmProp.name} · {effectivePrice(confirmProp.goldPrice)} gold
+              {hasLoanDefault && (
+                <span style={{ fontSize: 14, color: '#CC666660', textDecoration: 'line-through', marginLeft: 6 }}>
+                  {confirmProp.goldPrice}
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <button
@@ -175,14 +204,14 @@ export default function RealEstateScreen() {
               </button>
               <button
                 onClick={confirmPurchase}
-                disabled={gold < confirmProp.goldPrice}
+                disabled={gold < effectivePrice(confirmProp.goldPrice)}
                 style={{
-                  flex: 2, padding: '8px', background: gold >= confirmProp.goldPrice ? GOLD : '#4A3A00',
-                  border: 'none', borderRadius: 4, color: INK, cursor: gold >= confirmProp.goldPrice ? 'pointer' : 'not-allowed',
+                  flex: 2, padding: '8px', background: gold >= effectivePrice(confirmProp.goldPrice) ? GOLD : '#4A3A00',
+                  border: 'none', borderRadius: 4, color: INK, cursor: gold >= effectivePrice(confirmProp.goldPrice) ? 'pointer' : 'not-allowed',
                   fontFamily: '"Cinzel", serif', fontWeight: 700, fontSize: 17,
                 }}
               >
-                {gold < confirmProp.goldPrice ? 'Insufficient Gold' : '🪙 Buy Now'}
+                {gold < effectivePrice(confirmProp.goldPrice) ? 'Insufficient Gold' : '🪙 Buy Now'}
               </button>
             </div>
           </div>
@@ -191,6 +220,23 @@ export default function RealEstateScreen() {
 
       {/* ── Right: Property Listings ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+
+        {/* Loan default price inflation notice */}
+        {hasLoanDefault && (
+          <div style={{
+            background: '#2A0A0A', border: '2px solid #CC222260',
+            borderRadius: 6, padding: '10px 14px', marginBottom: 12,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 20 }}>⚠️</span>
+            <span style={{ fontFamily: '"Cinzel", serif', fontWeight: 700, color: '#FF6666', fontSize: 17 }}>
+              Loan Default Penalty
+            </span>
+            <span style={{ color: '#CC888880', fontSize: 17 }}>
+              — Barrax's complaint has inflated property prices by +{Math.round(buyMarkup * 100)}%.
+            </span>
+          </div>
+        )}
 
         {/* Winter freeze notice */}
         {isFrozen && (
@@ -205,6 +251,23 @@ export default function RealEstateScreen() {
             </span>
             <span style={{ color: '#4A9ECC80', fontSize: 17 }}>
               — Mountain passes sealed. No property purchases until the thaw.
+            </span>
+          </div>
+        )}
+
+        {/* Auction lockout banner */}
+        {isAuctionLockedOut && (
+          <div style={{
+            background: '#2A0A0A', border: '2px solid #CC2222',
+            borderRadius: 6, padding: '10px 14px', marginBottom: 12,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 20 }}>⚠</span>
+            <span style={{ fontFamily: '"Cinzel", serif', fontWeight: 700, color: '#CC4444', fontSize: 17 }}>
+              Auction Block Disgraced
+            </span>
+            <span style={{ color: '#CC444480', fontSize: 17 }}>
+              — Your reputation at the auction block needs time to recover. {lockoutDaysLeft} day{lockoutDaysLeft !== 1 ? 's' : ''} remaining.
             </span>
           </div>
         )}
@@ -231,6 +294,11 @@ export default function RealEstateScreen() {
               <span style={{ color: '#C4934A80', fontSize: 16 }}>
                 Current bid: {activePropertyAuction.currentBid}g · {leaderName} leads · {activePropertyAuction.roundsLeft} bid{activePropertyAuction.roundsLeft !== 1 ? 's' : ''} left
               </span>
+              {!isAuctionLockedOut && !activePropertyAuction.bluffAttempted && (
+                <span style={{ color: '#C4934A60', fontSize: 15, fontStyle: 'italic' }}>
+                  Bluff available
+                </span>
+              )}
               <button
                 onClick={() => resolvePropertyAuction()}
                 style={{
@@ -274,7 +342,8 @@ export default function RealEstateScreen() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
             {pagedProperties.map(prop => {
-              const canAfford = gold >= prop.goldPrice;
+              const displayPrice = effectivePrice(prop.goldPrice);
+              const canAfford = gold >= displayPrice;
               const isHighlighted = prop.id === highlightedPropertyId;
               return (
                 <div
@@ -293,7 +362,11 @@ export default function RealEstateScreen() {
                   <div style={{ fontSize: 17, color: '#C4934A70' }}>{(prop as typeof prop & { districtName: string }).districtName}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 20, fontWeight: 700, color: canAfford ? GOLD : '#8A7A40' }}>
-                      🪙 {prop.goldPrice}
+                      🪙 {displayPrice}{hasLoanDefault && prop.goldPrice !== displayPrice && (
+                        <span style={{ fontSize: 14, color: '#CC666660', textDecoration: 'line-through', marginLeft: 5 }}>
+                          {prop.goldPrice}
+                        </span>
+                      )}
                     </span>
                     <span style={{ background: INK + '80', color: PARCHMENT, padding: '2px 6px', borderRadius: 8, fontSize: 16 }}>
                       {prop.lairSize}
@@ -332,44 +405,116 @@ export default function RealEstateScreen() {
                             : `⚔️ ${rivals.find(r => r.id === activePropertyAuction.currentLeader)?.name ?? 'Rival'} leads`}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <input
-                          type="number"
-                          min={activePropertyAuction.currentBid + 5}
-                          value={bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5}
-                          onChange={e => setBidInput(Number(e.target.value))}
-                          style={{
-                            flex: 1, minWidth: 0, padding: '5px 6px',
-                            background: '#2C181050', border: `1px solid ${PARCHMENT}40`,
-                            borderRadius: 4, color: PARCHMENT, fontSize: 15, outline: 'none',
-                          }}
-                        />
-                        <button
-                          onClick={() => {
-                            const bid = bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5;
-                            if (bid >= activePropertyAuction.currentBid + 5 && gold >= bid) {
-                              playSound('coinLoss');
-                              placeBid(bid);
-                              setBidInput(0);
-                            }
-                          }}
-                          disabled={gold < (bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5)}
-                          style={{
-                            padding: '5px 8px', background: '#FF8C00',
-                            border: 'none', borderRadius: 4, color: INK,
-                            fontFamily: '"Cinzel", serif', fontWeight: 700, fontSize: 14,
-                            cursor: gold >= (bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5) ? 'pointer' : 'not-allowed',
-                            opacity: gold < (bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5) ? 0.5 : 1,
-                          }}
-                        >
-                          ⚡ Bid
-                        </button>
-                      </div>
+
+                      {/* Bluff picker or considering state */}
+                      {bluffPendingAmount !== null ? (
+                        <div style={{
+                          background: '#1A0A2A', border: '1px solid #8844CC80',
+                          borderRadius: 4, padding: '7px 8px',
+                          fontSize: 14, color: '#C488FF',
+                          fontStyle: 'italic', textAlign: 'center',
+                        }}>
+                          🎭 Rival considers your bluff of {bluffPendingAmount}g…
+                        </div>
+                      ) : showBluffPicker ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ fontSize: 13, color: '#C4934A80', textAlign: 'center', fontStyle: 'italic' }}>
+                            Declare a bluff amount:
+                          </div>
+                          {[gold + 20, gold + 40, gold + 60].map(amt => (
+                            <button
+                              key={amt}
+                              onClick={() => handleBluffSelect(amt)}
+                              style={{
+                                padding: '5px 8px', background: '#2A1040',
+                                border: '1px solid #8844CC60', borderRadius: 4,
+                                color: '#C488FF', fontSize: 13,
+                                fontFamily: '"Cinzel", serif', fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              🎭 Bluff {amt}g
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setShowBluffPicker(false)}
+                            style={{
+                              padding: '3px 8px', background: 'transparent',
+                              border: `1px solid ${PARCHMENT}20`, borderRadius: 4,
+                              color: '#C4934A60', fontSize: 12, cursor: 'pointer',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {!isAuctionLockedOut && (
+                            <>
+                              <input
+                                type="number"
+                                min={activePropertyAuction.currentBid + 5}
+                                value={bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5}
+                                onChange={e => setBidInput(Number(e.target.value))}
+                                style={{
+                                  flex: 1, minWidth: 0, padding: '5px 6px',
+                                  background: '#2C181050', border: `1px solid ${PARCHMENT}40`,
+                                  borderRadius: 4, color: PARCHMENT, fontSize: 15, outline: 'none',
+                                }}
+                              />
+                              <button
+                                onClick={() => {
+                                  const bid = bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5;
+                                  if (bid >= activePropertyAuction.currentBid + 5 && gold >= bid) {
+                                    playSound('coinLoss');
+                                    placeBid(bid);
+                                    setBidInput(0);
+                                  }
+                                }}
+                                disabled={gold < (bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5)}
+                                style={{
+                                  padding: '5px 8px', background: '#FF8C00',
+                                  border: 'none', borderRadius: 4, color: INK,
+                                  fontFamily: '"Cinzel", serif', fontWeight: 700, fontSize: 14,
+                                  cursor: gold >= (bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5) ? 'pointer' : 'not-allowed',
+                                  opacity: gold < (bidInput > 0 ? bidInput : activePropertyAuction.currentBid + 5) ? 0.5 : 1,
+                                }}
+                              >
+                                ⚡ Bid
+                              </button>
+                              {!activePropertyAuction.bluffAttempted && (
+                                <button
+                                  onClick={() => { playSound('uiClick'); setShowBluffPicker(true); }}
+                                  style={{
+                                    padding: '5px 8px', background: '#2A1040',
+                                    border: '1px solid #8844CC60', borderRadius: 4,
+                                    color: '#C488FF',
+                                    fontFamily: '"Cinzel", serif', fontWeight: 700, fontSize: 14,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  🎭 Bluff
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {isAuctionLockedOut && (
+                            <div style={{
+                              flex: 1, padding: '5px 8px',
+                              background: '#2A0A0A', border: '1px solid #CC222240',
+                              borderRadius: 4, color: '#CC4444', fontSize: 13,
+                              textAlign: 'center', fontStyle: 'italic',
+                            }}>
+                              ⚠ Locked out — {lockoutDaysLeft}d remaining
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <button
                       onClick={() => handleOffer(prop)}
-                      disabled={!canAfford || isFrozen}
+                      disabled={!canAfford || isFrozen || gold < displayPrice}
                       style={{
                         padding: '8px', width: '100%',
                         background: canAfford && !isFrozen ? GOLD : '#2C181040',
@@ -379,7 +524,7 @@ export default function RealEstateScreen() {
                         cursor: canAfford && !isFrozen ? 'pointer' : 'not-allowed',
                       }}
                     >
-                      {isFrozen ? '❄️ Roads Frozen' : canAfford ? '📜 Make Offer' : 'Need more gold'}
+                      {isFrozen ? '❄️ Roads Frozen' : canAfford ? '📜 Make Offer' : `Need ${displayPrice - gold}g more`}
                     </button>
                   )}
                 </div>

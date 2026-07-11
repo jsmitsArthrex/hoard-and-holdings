@@ -22,10 +22,27 @@ const SPECIES_COLOR: Record<string, string> = {
   white:  '#888888',
 };
 
+const FESTIVAL_ITEMS = [
+  {
+    id: 'festival-goblet',
+    label: 'Ancient Ceremonial Goblet',
+    description: 'A relic from the Festival vaults. The inscription is in Old Draconic and roughly translates to "first place." Worth a fortune to the right collector.',
+    baseValue: 200,
+    cost: 120,
+  },
+  {
+    id: 'festival-scale',
+    label: 'Spectral Dragon Scale',
+    description: 'Shed by the Spectral Challenger during the Aerial Display. Glimmers even in total darkness. Highly sought after by hoard curators.',
+    baseValue: 250,
+    cost: 150,
+  },
+];
+
 export default function BlackMarketScreen() {
   const {
     gold, day, blackMarketStock, blackMarketRefreshDay,
-    purchaseBlackMarketItem, setActiveScreen,
+    purchaseBlackMarketItem, setActiveScreen, festival, purchaseFestivalItem,
   } = useGameStore();
 
   const hasUnpurchased = (blackMarketStock ?? []).some(i => !i.purchased);
@@ -87,6 +104,86 @@ export default function BlackMarketScreen() {
 
         {/* ── Stock Panel ── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* ── Festival Stock ── */}
+          {festival?.active && (
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div style={{
+                  fontFamily: '"Cinzel", serif', fontSize: 13, fontWeight: 700,
+                  color: GOLD, letterSpacing: '0.05em',
+                }}>
+                  🎪 FESTIVAL STOCK
+                </div>
+                <span style={{
+                  background: '#3A2200', color: GOLD,
+                  fontSize: 11, fontWeight: 700, fontFamily: '"Cinzel", serif',
+                  padding: '2px 8px', borderRadius: 3, letterSpacing: '0.06em',
+                  border: `1px solid ${GOLD}50`,
+                }}>
+                  LIMITED
+                </span>
+              </div>
+              {FESTIVAL_ITEMS.map(item => {
+                const purchased = festival.festivalStockPurchased.includes(item.id);
+                const canAfford = gold >= item.cost;
+                const isDisabled = purchased || !canAfford;
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      background: purchased ? '#1A0A0210' : '#2C1A0080',
+                      border: `1px solid ${purchased ? GOLD + '20' : GOLD + '60'}`,
+                      borderRadius: 6, padding: '12px 14px', marginBottom: 8,
+                      opacity: purchased ? 0.5 : 1,
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        background: '#3A2200', color: GOLD,
+                        fontSize: 11, fontWeight: 700, fontFamily: '"Cinzel", serif',
+                        padding: '2px 7px', borderRadius: 3, letterSpacing: '0.06em',
+                      }}>
+                        FESTIVAL EXCLUSIVE
+                      </span>
+                      {purchased && (
+                        <span style={{ fontSize: 12, color: `${GOLD}60`, fontStyle: 'italic' }}>✓ purchased</span>
+                      )}
+                    </div>
+                    <div style={{ fontFamily: '"Cinzel", serif', fontWeight: 700, color: GOLD, fontSize: 17 }}>
+                      {item.label}
+                    </div>
+                    <div style={{ fontFamily: '"Crimson Text", serif', color: `${PARCHMENT}90`, fontSize: 16, lineHeight: 1.45 }}>
+                      {item.description}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                      <div style={{ fontFamily: '"Cinzel", serif', fontWeight: 700, color: canAfford ? GOLD : DANGER, fontSize: 16 }}>
+                        🪙 {item.cost} gold
+                      </div>
+                      {!purchased && (
+                        <button
+                          onClick={() => { if (!isDisabled) purchaseFestivalItem(item.id); }}
+                          disabled={isDisabled}
+                          style={{
+                            padding: '6px 16px',
+                            background: isDisabled ? '#2C181030' : GOLD,
+                            border: `2px solid ${isDisabled ? '#2C181050' : INK}`,
+                            borderRadius: 4, cursor: isDisabled ? 'default' : 'pointer',
+                            fontFamily: '"Cinzel", serif', fontWeight: 700,
+                            color: isDisabled ? `${PARCHMENT}40` : INK,
+                            fontSize: 15, opacity: isDisabled ? 0.6 : 1,
+                          }}
+                        >
+                          {!canAfford ? 'Cannot Afford' : 'Buy'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {!blackMarketStock || blackMarketStock.length === 0 ? (
             <div style={{

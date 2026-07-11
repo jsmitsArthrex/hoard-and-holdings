@@ -1,4 +1,4 @@
-import type { Rival, PendingEvent, StatusEffect } from '../types';
+import type { Rival, PendingEvent, StatusEffect, CouncilVoteResult } from '../types';
 import { makeStatusEffect } from './statusEffects';
 
 export interface CouncilMotion {
@@ -111,5 +111,98 @@ export function simulateRivalVotes(
     const sameAsPlayer = Math.random() < alignProbability;
     const votedAye = sameAsPlayer ? playerVoteAye : !playerVoteAye;
     return { name: r.name, votedAye };
+  });
+}
+
+export interface PlayerCouncilMotion {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  effectSummary: string;
+}
+
+export const PLAYER_COUNCIL_MOTIONS: PlayerCouncilMotion[] = [
+  {
+    id: 'kobold-labour-reform',
+    name: 'Kobold Labour Reform',
+    icon: '🪖',
+    description:
+      'You propose a sweeping reform of kobold labour contracts, citing unspecified productivity concerns. Passage would freeze all kobold wages for 5 days, including any seasonal adjustments.',
+    effectSummary: 'Kobold wage costs −50% for 5 days.',
+  },
+  {
+    id: 'hoard-authenticity-act',
+    name: 'Hoard Authenticity Act',
+    icon: '📋',
+    description:
+      'You table a certification scheme for dragon hoards, backed by a very official-looking wax seal you invented this morning. Passage grants a 15% auction premium on all hoard sales for 8 days.',
+    effectSummary: 'Auction sell prices +15% for 8 days.',
+  },
+  {
+    id: 'territorial-boundary-charter',
+    name: 'Territorial Boundary Charter',
+    icon: '🗺️',
+    description:
+      'You propose formalising territorial boundaries with a binding charter. Passage would prohibit rivals from acquiring new properties anywhere in the realm for 5 days while the maps are "professionally surveyed."',
+    effectSummary: 'Rivals cannot acquire new properties for 5 days.',
+  },
+  {
+    id: 'dragon-solidarity-tax',
+    name: 'Dragon Solidarity Tax',
+    icon: '💰',
+    description:
+      'You propose a one-time solidarity contribution from all council members toward "mutual draconic prosperity." The exact beneficiary is suspiciously unspecified. Passage collects gold from each rival immediately.',
+    effectSummary: 'Collect 30g from allies (relationship > 50) and 10g from rivals.',
+  },
+  {
+    id: 'adventurer-amnesty',
+    name: 'Adventurer Amnesty',
+    icon: '🕊️',
+    description:
+      'You propose a seasonal truce with the Adventurers\' Guild, citing "diplomatic fatigue" and "an excess of funerals." Passage halts all hero incursions for 5 days.',
+    effectSummary: 'No hero incursions for 5 days.',
+  },
+  {
+    id: 'rival-audit',
+    name: 'Rival Audit',
+    icon: '🔍',
+    description:
+      'You call for a surprise financial audit of a randomly selected council member. The auditor is, coincidentally, you. Passage forces one rival to disgorge 20g and damages their standing with the other council members.',
+    effectSummary: 'One random rival loses 20g equivalent (relationship −10) and all other rivals lose 5 relationship with each other.',
+  },
+];
+
+export function getPlayerCouncilMotion(id: string): PlayerCouncilMotion | undefined {
+  return PLAYER_COUNCIL_MOTIONS.find(m => m.id === id);
+}
+
+const RIVAL_AYE_FLAVOURS = [
+  'apparently impressed by the audacity.',
+  'perhaps hoping to claim credit later.',
+  'with the enthusiasm of someone who misread the motion.',
+  'after a long, calculating pause.',
+  'while refusing to make eye contact with anyone.',
+];
+
+const RIVAL_NAY_FLAVOURS = [
+  'with barely concealed delight.',
+  'citing three regulations that do not exist.',
+  'before the proposal was even finished.',
+  'and then wrote something in a small notebook.',
+  'in a tone that suggested personal satisfaction.',
+];
+
+export function simulateRivalVotesForPlayerMotion(
+  rivals: Rival[],
+): CouncilVoteResult['rivalVotes'] {
+  return rivals.map(r => {
+    const ayeProbability = r.relationship > 50 ? 0.6 : 0.4;
+    const votedAye = Math.random() < ayeProbability;
+    const flavourPool = votedAye ? RIVAL_AYE_FLAVOURS : RIVAL_NAY_FLAVOURS;
+    const flavour = `${r.name} votes ${votedAye ? 'Aye' : 'Nay'}, ${
+      flavourPool[Math.floor(Math.random() * flavourPool.length)]
+    }`;
+    return { name: r.name, votedAye, flavour };
   });
 }

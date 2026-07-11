@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { playSound } from '../../audio/audioEngine';
+import { PLAYER_COUNCIL_MOTIONS } from '../../engine/councilMotions';
 
 const PARCHMENT = '#C4934A';
 const GOLD = '#C9A227';
@@ -15,9 +16,17 @@ export default function EventModal() {
     councilVoteResult,
     resolveCouncilVote,
     clearCouncilVoteResult,
+    proposeCouncilMotion,
+    councilSessionsAttended,
   } = useGameStore();
 
+  const [showProposalPanel, setShowProposalPanel] = useState(false);
+
   const ev = pendingEvents[0];
+
+  useEffect(() => {
+    setShowProposalPanel(false);
+  }, [ev?.defId]);
 
   useEffect(() => {
     if (!ev) return;
@@ -148,31 +157,56 @@ export default function EventModal() {
                   VOTE RECORD
                 </div>
                 {/* Player vote */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ color: GOLD, fontFamily: '"Cinzel", serif', fontSize: 15, fontWeight: 700 }}>You</span>
-                  <span style={{
-                    color: councilVoteResult.playerVoteAye ? '#6dbf67' : '#d9534f',
-                    fontFamily: '"Cinzel", serif',
-                    fontSize: 14,
-                    fontWeight: 700,
-                  }}>
-                    {councilVoteResult.playerVoteAye ? '✔ Aye' : '✘ Nay'}
-                  </span>
-                </div>
-                {/* Rival votes */}
-                {councilVoteResult.rivalVotes.map((rv) => (
-                  <div key={rv.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ color: PARCHMENT, fontSize: 15 }}>{rv.name}</span>
+                {!councilVoteResult.isPlayerProposal && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ color: GOLD, fontFamily: '"Cinzel", serif', fontSize: 15, fontWeight: 700 }}>You</span>
                     <span style={{
-                      color: rv.votedAye ? '#6dbf67' : '#d9534f',
+                      color: councilVoteResult.playerVoteAye ? '#6dbf67' : '#d9534f',
                       fontFamily: '"Cinzel", serif',
                       fontSize: 14,
                       fontWeight: 700,
                     }}>
-                      {rv.votedAye ? '✔ Aye' : '✘ Nay'}
+                      {councilVoteResult.playerVoteAye ? '✔ Aye' : '✘ Nay'}
                     </span>
                   </div>
-                ))}
+                )}
+                {councilVoteResult.isPlayerProposal && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ color: GOLD, fontFamily: '"Cinzel", serif', fontSize: 15, fontWeight: 700 }}>You</span>
+                    <span style={{ color: `${PARCHMENT}80`, fontFamily: '"Cinzel", serif', fontSize: 14, fontStyle: 'italic' }}>
+                      — Abstained
+                    </span>
+                  </div>
+                )}
+                {/* Rival votes */}
+                {councilVoteResult.rivalVotes.map((rv) =>
+                  councilVoteResult.isPlayerProposal ? (
+                    <div key={rv.name} style={{ marginBottom: 6 }}>
+                      <span
+                        style={{
+                          color: rv.votedAye ? '#6dbf67' : '#d9534f',
+                          fontFamily: '"Crimson Text", serif',
+                          fontSize: 16,
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        {rv.flavour ?? `${rv.name} votes ${rv.votedAye ? 'Aye' : 'Nay'}.`}
+                      </span>
+                    </div>
+                  ) : (
+                    <div key={rv.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ color: PARCHMENT, fontSize: 15 }}>{rv.name}</span>
+                      <span style={{
+                        color: rv.votedAye ? '#6dbf67' : '#d9534f',
+                        fontFamily: '"Cinzel", serif',
+                        fontSize: 14,
+                        fontWeight: 700,
+                      }}>
+                        {rv.votedAye ? '✔ Aye' : '✘ Nay'}
+                      </span>
+                    </div>
+                  )
+                )}
               </div>
 
               {/* Effect applied */}
@@ -189,7 +223,28 @@ export default function EventModal() {
                     marginBottom: 16,
                   }}
                 >
-                  ⚡ {ev.effectSummary}
+                  ⚡ {councilVoteResult.isPlayerProposal
+                    ? councilVoteResult.proposedEffectSummary
+                    : ev.effectSummary}
+                </div>
+              )}
+
+              {/* Fail flavour for player proposals */}
+              {!councilVoteResult.passed && councilVoteResult.isPlayerProposal && councilVoteResult.failFlavourText && (
+                <div
+                  style={{
+                    background: `${DANGER}0d`,
+                    border: `1px solid ${DANGER}30`,
+                    borderRadius: 6,
+                    padding: '10px 14px',
+                    fontSize: 16,
+                    color: `${PARCHMENT}90`,
+                    fontFamily: '"Crimson Text", serif',
+                    fontStyle: 'italic',
+                    marginBottom: 16,
+                  }}
+                >
+                  {councilVoteResult.failFlavourText}
                 </div>
               )}
 
@@ -239,50 +294,247 @@ export default function EventModal() {
               >
                 ⚡ {ev.effectSummary}
               </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button
-                  onClick={() => {
-                    playSound('pageFlip');
-                    resolveCouncilVote(ev.councilMotionId!, true);
-                  }}
+              {showProposalPanel ? (
+                /* ── Proposal Selection Panel ── */
+                <div>
+                  <div
+                    style={{
+                      fontFamily: '"Cinzel", serif',
+                      fontSize: 13,
+                      color: `${GOLD}90`,
+                      letterSpacing: 1,
+                      marginBottom: 10,
+                    }}
+                  >
+                    SELECT YOUR MOTION
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {PLAYER_COUNCIL_MOTIONS.map((pm) => (
+                      <div
+                        key={pm.id}
+                        style={{
+                          background: `${GOLD}0d`,
+                          border: `1px solid ${GOLD}35`,
+                          borderRadius: 8,
+                          padding: '10px 12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 20 }}>{pm.icon}</span>
+                          <span
+                            style={{
+                              fontFamily: '"Cinzel", serif',
+                              fontWeight: 700,
+                              fontSize: 14,
+                              color: GOLD,
+                            }}
+                          >
+                            {pm.name}
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            fontSize: 14,
+                            color: `${PARCHMENT}99`,
+                            fontStyle: 'italic',
+                            margin: '0 0 8px',
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {pm.description}
+                        </p>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            color: GOLD,
+                            fontFamily: '"Cinzel", serif',
+                            marginBottom: 8,
+                          }}
+                        >
+                          ⚡ {pm.effectSummary}
+                        </div>
+                        <button
+                          onClick={() => {
+                            playSound('pageFlip');
+                            proposeCouncilMotion(pm.id);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            background: `${GOLD}25`,
+                            border: `2px solid ${GOLD}60`,
+                            borderRadius: 6,
+                            color: GOLD,
+                            fontFamily: '"Cinzel", serif',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          Propose This Motion
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setShowProposalPanel(false)}
+                    style={{
+                      width: '100%',
+                      marginTop: 10,
+                      padding: '9px',
+                      background: 'transparent',
+                      border: `1px solid ${PARCHMENT}30`,
+                      borderRadius: 6,
+                      color: `${PARCHMENT}70`,
+                      fontFamily: '"Cinzel", serif',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ← Back to Vote
+                  </button>
+                </div>
+              ) : (
+                /* ── Aye / Nay (+ optional Abstain & Propose) ── */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => {
+                        playSound('pageFlip');
+                        resolveCouncilVote(ev.councilMotionId!, true);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '14px 10px',
+                        background: `${GREEN}33`,
+                        border: `2px solid ${GREEN}88`,
+                        borderRadius: 6,
+                        color: '#6dbf67',
+                        fontFamily: '"Cinzel", serif',
+                        fontWeight: 900,
+                        fontSize: 20,
+                        cursor: 'pointer',
+                        letterSpacing: 1,
+                      }}
+                    >
+                      ✔ Aye
+                    </button>
+                    <button
+                      onClick={() => {
+                        playSound('pageFlip');
+                        resolveCouncilVote(ev.councilMotionId!, false);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '14px 10px',
+                        background: `${DANGER}33`,
+                        border: `2px solid ${DANGER}88`,
+                        borderRadius: 6,
+                        color: '#d9534f',
+                        fontFamily: '"Cinzel", serif',
+                        fontWeight: 900,
+                        fontSize: 20,
+                        cursor: 'pointer',
+                        letterSpacing: 1,
+                      }}
+                    >
+                      ✘ Nay
+                    </button>
+                  </div>
+                  {(councilSessionsAttended ?? 0) >= 3 && (
+                    <button
+                      onClick={() => {
+                        playSound('uiClick');
+                        setShowProposalPanel(true);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '11px 10px',
+                        background: `${PARCHMENT}10`,
+                        border: `2px dashed ${GOLD}50`,
+                        borderRadius: 6,
+                        color: GOLD,
+                        fontFamily: '"Cinzel", serif',
+                        fontWeight: 700,
+                        fontSize: 15,
+                        cursor: 'pointer',
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      ↗ Abstain &amp; Propose Your Own Motion
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          ) : ev.defId === 'koboldLetter' ? (
+            /* ── Kobold Letter ── */
+            <>
+              <div
+                style={{
+                  background: 'linear-gradient(160deg, #f5f0e8, #ede5d0)',
+                  border: '1px solid #b8a878',
+                  borderRadius: 4,
+                  padding: '20px 24px',
+                  marginBottom: 18,
+                  boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.12)',
+                  fontFamily: '"Crimson Text", Georgia, serif',
+                  color: '#2a1f0e',
+                }}
+              >
+                <p
                   style={{
-                    flex: 1,
-                    padding: '14px 10px',
-                    background: `${GREEN}33`,
-                    border: `2px solid ${GREEN}88`,
-                    borderRadius: 6,
-                    color: '#6dbf67',
-                    fontFamily: '"Cinzel", serif',
-                    fontWeight: 900,
-                    fontSize: 20,
-                    cursor: 'pointer',
-                    letterSpacing: 1,
+                    fontSize: 17,
+                    fontStyle: 'italic',
+                    marginBottom: 16,
+                    color: '#3a2e1a',
+                    lineHeight: 1.5,
                   }}
                 >
-                  ✔ Aye
-                </button>
-                <button
-                  onClick={() => {
-                    playSound('pageFlip');
-                    resolveCouncilVote(ev.councilMotionId!, false);
-                  }}
+                  {ev.letterSalutation}
+                </p>
+                <p
                   style={{
-                    flex: 1,
-                    padding: '14px 10px',
-                    background: `${DANGER}33`,
-                    border: `2px solid ${DANGER}88`,
-                    borderRadius: 6,
-                    color: '#d9534f',
-                    fontFamily: '"Cinzel", serif',
-                    fontWeight: 900,
-                    fontSize: 20,
-                    cursor: 'pointer',
-                    letterSpacing: 1,
+                    fontSize: 18,
+                    lineHeight: 1.75,
+                    margin: '0 0 18px 12px',
+                    color: '#2a1f0e',
                   }}
                 >
-                  ✘ Nay
-                </button>
+                  {ev.description}
+                </p>
+                <p
+                  style={{
+                    fontSize: 17,
+                    fontStyle: 'italic',
+                    textAlign: 'right',
+                    margin: 0,
+                    color: '#3a2e1a',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {ev.letterClosing}
+                </p>
               </div>
+              <button
+                onClick={() => { playSound('uiClick'); dismissPendingEvent(); }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: `${PARCHMENT}18`,
+                  border: `2px solid ${PARCHMENT}40`,
+                  borderRadius: 6,
+                  color: PARCHMENT,
+                  fontFamily: '"Cinzel", serif',
+                  fontWeight: 700,
+                  fontSize: 17,
+                  cursor: 'pointer',
+                  letterSpacing: 0.5,
+                }}
+              >
+                File Under: Ignored
+              </button>
             </>
           ) : (
             /* ── Normal event rendering ── */

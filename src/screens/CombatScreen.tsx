@@ -35,8 +35,23 @@ function getGoldReward(ageTier: number): number {
 type CombatPhase = 'preview' | 'fighting' | 'outcome';
 interface LogEntry { text: string; color?: string; }
 
+function buildNemesisParty(leaderName: string, ageTier: number): HeroMonster[] {
+  let leader: HeroMonster | undefined;
+  for (const tier of heroTiers) {
+    leader = tier.representatives.find(r => r.name === leaderName);
+    if (leader) break;
+  }
+  const base = heroTiers[Math.min(ageTier - 1, heroTiers.length - 1)];
+  if (!leader) leader = base.representatives[0];
+  const companions = [...base.representatives]
+    .filter(r => r.name !== leader!.name)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 1 + Math.floor(Math.random() * 2));
+  return [leader, ...companions];
+}
+
 export default function CombatScreen() {
-  const { dragon, addGold, addHoardItem, addDread, logEvent, setActiveScreen, trackAdventurerDefeated, trackCombatLoss, statusEffects, activeIncursions, dismissIncursion, kobolds, dragonCurrentHP, updateDragonHP, activeRansom, captureForRansom, day, dread } = useGameStore();
+  const { dragon, addGold, addHoardItem, addDread, logEvent, setActiveScreen, trackAdventurerDefeated, trackCombatLoss, statusEffects, activeIncursions, dismissIncursion, kobolds, dragonCurrentHP, updateDragonHP, activeRansom, captureForRansom, day, dread, nemesis, recordPartyDefeat, resolveNemesisOutcome } = useGameStore();
   const ageTier = dragon?.ageTier ?? 1;
   const breed = dragonBreeds.find(b => b.id === (dragon?.breedId ?? 'fire'));
   const scoutTraitBonus = kobolds
@@ -48,7 +63,18 @@ export default function CombatScreen() {
   const koboldBonus = Math.min(kobolds.length, 3);
   const persistedHP = dragonCurrentHP ?? dragonMaxHP;
 
-  const [party] = useState<HeroMonster[]>(() => generateParty(ageTier));
+  const isNemesisFight = activeIncursions[0]?.isNemesis ?? false;
+  const nemesisLeaderName = nemesis?.leaderName ?? '';
+  const nemesisVisitCount = nemesis?.nemesisVisitCount ?? 0;
+  const nemesisStatMult = isNemesisFight ? (nemesisVisitCount === 0 ? 1.5 : nemesisVisitCount === 1 ? 2.0 : 2.5) : 1;
+  const nemesisGoldMult = isNemesisFight ? (nemesisVisitCount === 0 ? 2 : nemesisVisitCount === 1 ? 3 : 4) : 1;
+  const nemesisLootCount = isNemesisFight ? (nemesisVisitCount === 0 ? 2 : nemesisVisitCount === 1 ? 3 : 4) : 1;
+  const battleHardened = isNemesisFight && nemesisVisitCount >= 2;
+  const vengeancePact = isNemesisFight && nemesisVisitCount === 1;
+
+  const [party] = useState<HeroMonster[]>(() =>
+    isNemesisFight && nemesis ? buildNemesisParty(nemesis.leaderName, ageTier) : generateParty(ageTier)
+  );
   const [goldReward] = useState(() => getGoldReward(ageTier));
   const combatRewardMult = Math.max(1, getModifier(statusEffects, 'combatReward'));
   const effectiveGoldReward = Math.round(goldReward * combatRewardMult);
@@ -64,15 +90,24 @@ export default function CombatScreen() {
   const [healAmount, setHealAmount] = useState(0);
   const logRef = useRef<HTMLDivElement>(null);
 
+  const fightPartyName = isNemesisFight
+    ? (activeIncursions[0]?.partyName ?? `${nemesisLeaderName}'s Party`)
+    : (activeIncursions[0]?.partyName ?? `${party[0]?.name ?? 'Unknown'}'s Party`);
+  const fightLeaderName = isNemesisFight ? nemesisLeaderName : (party[0]?.name ?? 'Unknown');
+  const fightLeaderClass = party[0] ? adventurerClassLabel(party[0]) : 'Adventurer';
+
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [log]);
 
   function startCombat() {
-    setHeroHPs(party.map(h => h.hp));
+    setHeroHPs(party.map(h => Math.round(h.hp * nemesisStatMult)));
     setDragonHP(persistedHP);
     setPhase('fighting');
-    setLog([{ text: `⚔️ Round 1 — ${party.length} adventurers storm your lair!`, color: PARCHMENT }]);
+    const openLine = isNemesisFight
+      ? `⚔ ${nemesisLeaderName} has returned. The lair goes very quiet.`
+      : `⚔️ Round 1 — ${party.length} adventurers storm your lair!`;
+    setLog([{ text: openLine, color: isNemesisFight ? '#CC2222' : PARCHMENT }]);
   }
 
   function finishCombat(won: boolean, finalHP: number) {
@@ -80,27 +115,46 @@ export default function CombatScreen() {
     setPhase('outcome');
     if (won) {
       playSound('coinPickup');
-      addGold(effectiveGoldReward);
-      const loot = randomLoot();
-      addHoardItem({ id: `loot-${Date.now()}`, name: loot.name, baseValue: loot.baseValue, lootedOnDay: dragon?.age ?? 1 });
-      addDread(3);
+      const baseReward = Math.round(effectiveGoldReward * nemesisGoldMult);
+      addGold(baseReward);
+      for (let li = 0; li < nemesisLootCount; li++) {
+        const loot = randomLoot();
+        addHoardItem({ id: `loot-${Date.now()}-${li}`, name: loot.name, baseValue: loot.baseValue, lootedOnDay: dragon?.age ?? 1 });
+      }
+      addDread(3 + (vengeancePact ? 5 : 0));
       trackAdventurerDefeated();
       if (activeIncursions.length > 0) dismissIncursion(activeIncursions[0].id);
       const regenAmt = Math.floor((dragonMaxHP - finalHP) * 0.4);
       updateDragonHP(Math.min(dragonMaxHP, finalHP + regenAmt));
       setHealAmount(regenAmt);
-      logEvent(`Defeated ${party.length} adventurers! Earned ${effectiveGoldReward} gold and looted ${loot.name}.`);
+      if (isNemesisFight) {
+        resolveNemesisOutcome(true, nemesisLeaderName);
+        logEvent(`Defeated ${nemesisLeaderName} (nemesis visit ${nemesisVisitCount + 1})! Earned ${baseReward} gold and ${nemesisLootCount} loot item${nemesisLootCount > 1 ? 's' : ''}.`, 'combat');
+      } else {
+        recordPartyDefeat(fightPartyName, fightLeaderName, fightLeaderClass);
+        logEvent(`Defeated ${party.length} adventurers! Earned ${baseReward} gold and looted items.`, 'combat');
+      }
     } else {
-      playSound('coinLoss');
       trackCombatLoss();
-      const healCost = 10 + Math.floor(Math.random() * 11);
-      setGoldLost(healCost);
-      addGold(-healCost);
-      addDread(-1);
-      const restoredHP = Math.floor(dragonMaxHP * 0.5);
-      updateDragonHP(restoredHP);
-      setHealAmount(restoredHP);
-      logEvent(`Driven off by adventurers! Lost ${healCost} gold in healing costs.`);
+      if (isNemesisFight) {
+        addDread(-1);
+        const restoredHP = Math.floor(dragonMaxHP * 0.5);
+        updateDragonHP(restoredHP);
+        setHealAmount(restoredHP);
+        if (activeIncursions.length > 0) dismissIncursion(activeIncursions[0].id);
+        resolveNemesisOutcome(false, nemesisLeaderName);
+        logEvent(`${nemesisLeaderName} drove you back. No healing fee charged.`, 'combat');
+      } else {
+        playSound('coinLoss');
+        const healCost = 10 + Math.floor(Math.random() * 11);
+        setGoldLost(healCost);
+        addGold(-healCost);
+        addDread(-1);
+        const restoredHP = Math.floor(dragonMaxHP * 0.5);
+        updateDragonHP(restoredHP);
+        setHealAmount(restoredHP);
+        logEvent(`Driven off by adventurers! Lost ${healCost} gold in healing costs.`, 'combat');
+      }
     }
   }
 
@@ -164,7 +218,7 @@ export default function CombatScreen() {
     newHPs.forEach((hp, i) => {
       if (hp <= 0) return;
       const hero = party[i];
-      const atkRoll = d(20) + statMod(Math.max(hero.str, hero.dex));
+      const atkRoll = d(20) + statMod(Math.max(hero.str, hero.dex)) + (battleHardened ? 4 : 0);
       if (atkRoll >= dragonAC) {
         const dmg = Math.max(1, d(8) + statMod(Math.max(hero.str, hero.dex)));
         curDragonHP = Math.max(0, curDragonHP - dmg);
@@ -211,8 +265,19 @@ export default function CombatScreen() {
         <button onClick={() => setActiveScreen('hub')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: PARCHMENT, cursor: 'pointer', fontFamily: '"Cinzel", serif', fontSize: 17, marginBottom: 16, padding: 0 }}>
           <ArrowLeft size={19} /> Return to Lair
         </button>
-        <h2 style={{ fontFamily: '"Cinzel", serif', color: PARCHMENT, fontSize: 22, fontWeight: 700, marginBottom: 4 }}>⚔️ Hunt Adventurers</h2>
-        <div style={{ color: '#C4934A60', fontSize: 18, marginBottom: 20 }}>Tier: {tierLabel} party</div>
+        {isNemesisFight ? (
+          <h2 style={{ fontFamily: '"Cinzel", serif', color: '#CC2222', fontSize: 22, fontWeight: 700, marginBottom: 4 }}>⚔ Nemesis Returns</h2>
+        ) : (
+          <h2 style={{ fontFamily: '"Cinzel", serif', color: PARCHMENT, fontSize: 22, fontWeight: 700, marginBottom: 4 }}>⚔️ Hunt Adventurers</h2>
+        )}
+        <div style={{ color: '#C4934A60', fontSize: 18, marginBottom: isNemesisFight ? 8 : 20 }}>Tier: {tierLabel} party</div>
+        {isNemesisFight && (
+          <div style={{ background: '#CC222215', border: '1px solid #CC222240', borderRadius: 6, padding: '10px 16px', marginBottom: 20, fontStyle: 'italic', color: PARCHMENT, fontSize: 17, lineHeight: 1.65 }}>
+            {nemesisVisitCount === 0 && `${nemesisLeaderName} has returned. They have a scar you gave them. They do not look pleased about it.`}
+            {nemesisVisitCount === 1 && `${nemesisLeaderName} is back. Again. They've spent three weeks training at the Temple of Furious Regret and are evidently very committed.`}
+            {nemesisVisitCount >= 2 && `${nemesisLeaderName} has returned for the ${nemesisVisitCount + 1}th time. "I have trained in the mountains of Khar'Zeth for THIS moment," they announce. You wait politely for them to finish.`}
+          </div>
+        )}
 
         {/* ── PREVIEW ── */}
         {phase === 'preview' && (
@@ -236,7 +301,7 @@ export default function CombatScreen() {
                 <Info label="Attack Mod" value={`${attackMod >= 0 ? '+' : ''}${attackMod}`} />
                 <Info label="Your AC" value={String(dragonAC)} />
                 <Info label="Your HP" value={persistedHP < dragonMaxHP ? `${persistedHP} / ${dragonMaxHP}` : String(dragonMaxHP)} color={persistedHP < dragonMaxHP ? GOLD : GREEN} />
-                <Info label="Gold Reward" value={`🪙 ${effectiveGoldReward}${combatRewardMult > 1 ? ` (×${combatRewardMult} 🏆)` : ''}`} color={GOLD} />
+                <Info label="Gold Reward" value={`🪙 ${Math.round(effectiveGoldReward * nemesisGoldMult)}${isNemesisFight ? ` (×${nemesisGoldMult} ⚔)` : combatRewardMult > 1 ? ` (×${combatRewardMult} 🏆)` : ''}`} color={GOLD} />
               </div>
             </div>
             <div style={{ background: '#1A0A2E60', border: `1px solid ${PARCHMENT}20`, borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 16, color: '#C4934A80', lineHeight: 1.7 }}>
@@ -249,7 +314,7 @@ export default function CombatScreen() {
               {scoutTraitBonus > 0 && <div style={{ marginTop: 4, color: '#C9A22790' }}>🔭 Shadow Step scouts: +{scoutTraitBonus} to hit</div>}
             </div>
             <button onClick={startCombat} style={{ width: '100%', padding: '18px', background: DANGER, border: `2px solid ${INK}`, borderRadius: 6, color: '#E8D5A0', fontFamily: '"Cinzel", serif', fontWeight: 700, fontSize: 20, cursor: 'pointer' }}>
-              ⚔️ Enter Battle!
+              {isNemesisFight ? '⚔ Confront Your Nemesis!' : '⚔️ Enter Battle!'}
             </button>
           </>
         )}
@@ -297,21 +362,33 @@ export default function CombatScreen() {
         {phase === 'outcome' && (
           <div style={{ background: win ? '#4ACC7A15' : '#CC222215', border: `2px solid ${win ? '#4ACC7A' : '#CC2222'}40`, borderRadius: 8, padding: '24px', textAlign: 'center' }}>
             <div style={{ fontSize: 26, fontFamily: '"Cinzel", serif', fontWeight: 700, color: win ? GREEN : '#CC4444', marginBottom: 16 }}>
-              {win ? '⚔️ VICTORY!' : '💨 RETREAT!'}
+              {win ? (isNemesisFight ? '⚔ NEMESIS DEFEATED!' : '⚔️ VICTORY!') : (isNemesisFight ? '⚔ NEMESIS WITHDRAWS' : '💨 RETREAT!')}
             </div>
             <div ref={logRef} style={{ background: '#080303', border: `1px solid ${PARCHMENT}20`, borderRadius: 6, padding: '10px 14px', maxHeight: 200, overflowY: 'auto', fontSize: 15, lineHeight: 1.65, marginBottom: 20, textAlign: 'left' }}>
               {log.map((e, i) => <div key={i} style={{ color: e.color ?? '#C4934A60' }}>{e.text}</div>)}
             </div>
+            {!win && isNemesisFight && (
+              <div style={{ fontStyle: 'italic', color: PARCHMENT, fontSize: 17, lineHeight: 1.7, textAlign: 'left', marginBottom: 20, background: '#CC222215', border: '1px solid #CC222240', borderRadius: 6, padding: '12px 16px' }}>
+                "{nemesisLeaderName} stands over you. 'Next time,' they say, cleaning their blade. 'I will not be in a hurry.' They leave. Slowly."
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
               {win ? (
                 <>
-                  <Reward icon="🪙" label={`+${effectiveGoldReward} gold${combatRewardMult > 1 ? ' ×2' : ''}`} color={GOLD} />
-                  <Reward icon="📦" label="+1 loot item" color='#8A7ACC' />
-                  <Reward icon="💀" label="+3 Dread" color='#CC4444' />
+                  <Reward icon="🪙" label={`+${Math.round(effectiveGoldReward * nemesisGoldMult)} gold${isNemesisFight ? ` (×${nemesisGoldMult})` : combatRewardMult > 1 ? ' ×2' : ''}`} color={GOLD} />
+                  <Reward icon="📦" label={isNemesisFight ? `+${nemesisLootCount} loot items` : '+1 loot item'} color='#8A7ACC' />
+                  <Reward icon="💀" label={`+${3 + (vengeancePact ? 5 : 0)} Dread${vengeancePact ? ' (Vengeance Pact!)' : ''}`} color='#CC4444' />
                   {healAmount > 0
                     ? <Reward icon="❤️‍🔥" label={`+${healAmount} HP regenerated`} color={GREEN} />
                     : <Reward icon="❤️" label="Full health maintained" color={GREEN} />
                   }
+                  {battleHardened && <Reward icon="🛡️" label="Battle-Hardened foe defeated!" color='#CC8800' />}
+                </>
+              ) : isNemesisFight ? (
+                <>
+                  <Reward icon="⚔" label="No healing fee — the nemesis lets you live" color={GOLD} />
+                  <Reward icon="🩹" label={`Healed to ${healAmount} HP`} color={GOLD} />
+                  <Reward icon="💀" label="−1 Dread" color='#8A8A8A' />
                 </>
               ) : (
                 <>

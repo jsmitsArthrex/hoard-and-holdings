@@ -16,6 +16,7 @@ type RumourState = Pick<
   | 'day'
   | 'gameLog'
   | 'gameSettings'
+  | 'hoardArrangement'
 >;
 
 interface RumourCandidate {
@@ -193,6 +194,27 @@ export function generateRumours(state: RumourState): string[] {
     candidates.push({
       score: 20,
       text: `A merchant caravan was reportedly delayed three hours after accidentally wandering into disputed dragon territory.`,
+    });
+  }
+
+  // 19. Hoard Arrangement flavour rumours
+  if (state.hoardArrangement === 'pile' && state.hoardItems.length >= 3) {
+    candidates.push({
+      score: 52,
+      text: `Word from the road: ${dragonName}'s cave glitters so brightly travelers mistake it for a second sun.`,
+    });
+  }
+  if (state.hoardArrangement === 'wall' && state.hoardItems.length >= 3) {
+    const partyCount = Math.max(1, Math.floor(state.hoardItems.length / 2));
+    candidates.push({
+      score: 52,
+      text: `${dragonName}'s lair reportedly contains the mounted heads of ${partyCount} adventuring ${partyCount === 1 ? 'party' : 'parties'}. The count is disputed.`,
+    });
+  }
+  if (state.hoardArrangement === 'cabinet' && state.hoardItems.length >= 3) {
+    candidates.push({
+      score: 52,
+      text: `Scholars have reportedly offered ${dragonName} a small fortune simply for the right to catalogue the collection. Reportedly refused.`,
     });
   }
 

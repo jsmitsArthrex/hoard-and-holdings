@@ -16,12 +16,14 @@ function getMarketCondition(mult: number): { label: string; color: string; icon:
 }
 
 export default function AuctionScreen() {
-  const { gold, day, hoardItems, goldHistory, sellHoardItem, setActiveScreen } = useGameStore();
+  const { gold, day, hoardItems, goldHistory, sellHoardItem, setActiveScreen, hoardArrangement } = useGameStore();
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [lastSold, setLastSold] = useState<{ name: string; price: number } | null>(null);
 
-  const mult = priceIndex[(day - 1) % priceIndex.length];
-  const market = getMarketCondition(mult);
+  const baseMult = priceIndex[(day - 1) % priceIndex.length];
+  const cabinetBonus = hoardArrangement === 'cabinet' ? 0.05 : 0;
+  const mult = baseMult + cabinetBonus;
+  const market = getMarketCondition(baseMult);
 
   const doSell = (itemId: string) => {
     const item = hoardItems.find(h => h.id === itemId);
@@ -73,7 +75,7 @@ export default function AuctionScreen() {
           <div>
             <div style={{ fontFamily: '"Cinzel", serif', fontSize: 16, color: '#C4934A60', marginBottom: 2 }}>MULTIPLIER</div>
             <div style={{ fontFamily: '"Cinzel", serif', fontWeight: 700, fontSize: 21, color: market.color }}>
-              ×{mult.toFixed(2)}
+              ×{mult.toFixed(2)}{cabinetBonus > 0 && <span style={{ fontSize: 14, color: '#4ACC7A', marginLeft: 6 }}>+5% cabinet</span>}
             </div>
           </div>
           <div>

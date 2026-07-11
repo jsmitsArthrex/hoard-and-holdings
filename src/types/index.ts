@@ -57,6 +57,9 @@ export interface KoboldEmployee {
   trait?: KoboldTrait;
   sabotagedUntilDay?: number;
   onExpedition?: boolean;
+  isLieutenant?: boolean;
+  lieutenantSkill?: string;
+  lieutenantAssignment?: 'defence' | 'recruitment' | 'trade' | null;
 }
 
 export interface HoardItem {
@@ -75,13 +78,17 @@ export interface Rival {
   relationship: number;
   poachedKobold?: KoboldEmployee;
   sabotagedUntilDay?: number;
+  lastGiftDay?: number;
 }
+
+export type LogCategory = 'combat' | 'economy' | 'kobold' | 'rival' | 'event' | 'property' | 'system';
 
 export interface GameLogEntry {
   id: string;
   day: number;
   timeOfDay: TimeOfDay;
   message: string;
+  category: LogCategory;
 }
 
 export interface GoldHistoryEntry {
@@ -102,17 +109,31 @@ export interface ActiveIncursion {
   partyName: string;
   tier: 1 | 2 | 3 | 4;
   daySpawned: number;
+  isNemesis?: boolean;
+}
+
+export interface NemesisData {
+  partyName: string;
+  leaderName: string;
+  leaderClass: string;
+  defeatCount: number;
+  nemesisVisitCount: number;
+  isCurrentlyActive: boolean;
+  nextSpawnDay: number;
 }
 
 export interface CouncilVoteResult {
   motionId: string;
   motionName: string;
   playerVoteAye: boolean;
-  rivalVotes: Array<{ name: string; votedAye: boolean }>;
+  rivalVotes: Array<{ name: string; votedAye: boolean; flavour?: string }>;
   tallyAye: number;
   tallyNay: number;
   passed: boolean;
   playerFavored: boolean;
+  isPlayerProposal?: boolean;
+  proposedEffectSummary?: string;
+  failFlavourText?: string;
 }
 
 export interface StatusEffect {
@@ -134,6 +155,19 @@ export interface PendingEvent {
   isPassive: boolean;
   councilMotionId?: string;
   choices?: Array<{ label: string; description: string }>;
+  letterSalutation?: string;
+  letterBody?: string;
+  letterClosing?: string;
+}
+
+export interface PendingKoboldLetter {
+  koboldName: string;
+  koboldRole: string;
+  daysEmployed: number;
+  deliverOnDay: number;
+  letterBody: string;
+  salutation: string;
+  closing: string;
 }
 
 export interface PrisonerRansom {
@@ -168,11 +202,51 @@ export interface ExpeditionResult {
   detail: string;
 }
 
+export interface ActiveDispute {
+  id: string;
+  rivalId: number;
+  rivalName: string;
+  propertyId: string;
+  propertyName: string;
+  filedOnDay: number;
+  expiresOnDay: number;
+  round: number;
+  playerScore: number;
+  resolved: boolean;
+}
+
 export interface PropertyAuction {
   propertyId: string;
   currentBid: number;
   currentLeader: 'player' | number;
   roundsLeft: number;
+  bluffAttempted?: boolean;
+  bluffAmount?: number;
+  bluffBusted?: boolean;
+}
+
+export type LoanTier = 'small' | 'medium' | 'large';
+
+export interface ActiveLoan {
+  id: string;
+  tier: LoanTier;
+  borrowedAmount: number;
+  repayAmount: number;
+  takenOnDay: number;
+  dueByDay: number;
+  defaulted: boolean;
+}
+
+export interface RumourBet {
+  id: string;
+  rumourText: string;
+  betType: 'rival_buys_property' | 'hero_spawn' | 'economy_peak' | 'seasonal_event';
+  betTarget?: string;
+  expiresOnDay: number;
+  betPlaced: boolean;
+  resolved: boolean;
+  won?: boolean;
+  isActuallyTrue: boolean;
 }
 
 export interface GameState {
@@ -216,4 +290,35 @@ export interface GameState {
   dragonAbilityUsedToday: boolean;
   seasonalEventFiredThisSeason: boolean;
   tournamentActive: boolean;
+  hoardArrangement?: 'pile' | 'wall' | 'cabinet';
+  lastArrangementChangeDay?: number;
+  activeLoan?: ActiveLoan;
+  activeDispute: ActiveDispute | null;
+  heroPartyDefeatCounts: Record<string, number>;
+  nemesis?: NemesisData;
+  auctionLockoutUntilDay: number;
+  lastTalentShowDay?: number;
+  rumourBet?: RumourBet;
+  drinkingGamePlayedToday: boolean;
+  councilSessionsAttended: number;
+  activeWantedPoster?: {
+    dragonName: string;
+    bounty: number;
+    crimes: string[];
+    threatLevel: string;
+    issuedOnDay: number;
+    expiresOnDay: number;
+    districtName: string;
+  };
+  festival?: {
+    active: boolean;
+    startsOnDay: number;
+    endsOnDay: number;
+    aerialDisplayUsed: boolean;
+    rivalChallengePropertyId?: string;
+    rivalChallengeRivalId?: number;
+    rivalChallengeWinner?: 'player' | 'rival' | null;
+    festivalStockPurchased: string[];
+  };
+  pendingKoboldLetters: PendingKoboldLetter[];
 }

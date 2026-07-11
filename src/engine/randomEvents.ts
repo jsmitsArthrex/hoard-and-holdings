@@ -5,7 +5,8 @@ import { LOOT_TABLE } from './gameClock';
 
 export type StateSnap = Pick<
   GameState,
-  'dread' | 'kobolds' | 'rivals' | 'hoardItems' | 'gold' | 'day' | 'dragon'
+  'dread' | 'kobolds' | 'rivals' | 'hoardItems' | 'gold' | 'day' | 'dragon' |
+  'playerPropertyIds' | 'adventurersDefeated' | 'activeWantedPoster'
 >;
 
 export interface EventOutcome {
@@ -619,6 +620,21 @@ export const ALL_RANDOM_EVENTS: RandomEventDef[] = [
         }),
       },
     ],
+  },
+
+  {
+    id: 'wantedPoster',
+    title: 'A Bounty Is Posted',
+    icon: '📜',
+    weight: 4,
+    canFire: (state) => state.dread >= 50 && !state.activeWantedPoster,
+    passive: (state) => ({
+      description: `The Adventurers' Guild has officially posted a bounty on you. A courier was paid extra to nail it to your front door. The audacity.`,
+      outcome: {
+        logMessage: `Wanted poster issued! Bounty: ${state.dread * 3}g on your head.`,
+        effectSummary: 'Wanted poster now active.',
+      },
+    }),
   },
 
   {

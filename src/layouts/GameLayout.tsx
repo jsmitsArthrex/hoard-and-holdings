@@ -9,6 +9,7 @@ import { TITLE_DEFS } from '../data/titles';
 import EventModal from '../components/events/EventModal';
 import OptionsModal from '../components/ui/OptionsModal';
 import AboutModal from '../components/ui/AboutModal';
+import ChronicleModal from '../components/ui/ChronicleModal';
 
 const INK = '#2C1810';
 const PARCHMENT = '#C4934A';
@@ -73,6 +74,7 @@ export default function GameLayout({ children }: { children: React.ReactNode }) 
   const tickEconomy = useStore((s) => s.tickEconomy);
   const [showOptions, setShowOptions] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showChronicle, setShowChronicle] = useState(false);
 
   useEffect(() => {
     startMusic();
@@ -199,21 +201,25 @@ export default function GameLayout({ children }: { children: React.ReactNode }) 
           </HoverTooltip>
 
           {/* Active incursions badge */}
-          {activeIncursions.length > 0 && (
-            <HoverTooltip text="Active hero incursions threatening your hoard! Head to the Combat screen to defend.">
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                background: DANGER, color: '#FFCCCC',
-                padding: '3px 8px', borderRadius: 3,
-                fontFamily: '"Cinzel", serif', fontSize: 16,
-                animation: 'pulse 1.5s ease-in-out infinite',
-                border: `1px solid #FF000040`,
-              }}>
-                <Swords size={17} />
-                {activeIncursions.length} incursion{activeIncursions.length > 1 ? 's' : ''}
-              </div>
-            </HoverTooltip>
-          )}
+          {activeIncursions.length > 0 && (() => {
+            const hasNemesis = activeIncursions.some(i => i.isNemesis);
+            return (
+              <HoverTooltip text={hasNemesis ? 'Your nemesis has returned! Confront them in the Combat screen.' : 'Active hero incursions threatening your hoard! Head to the Combat screen to defend.'}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: hasNemesis ? '#7A0000' : DANGER,
+                  color: hasNemesis ? '#FFAAAA' : '#FFCCCC',
+                  padding: '3px 8px', borderRadius: 3,
+                  fontFamily: '"Cinzel", serif', fontSize: 16,
+                  animation: 'pulse 1.5s ease-in-out infinite',
+                  border: `1px solid ${hasNemesis ? '#CC000060' : '#FF000040'}`,
+                }}>
+                  {hasNemesis ? <span style={{ fontSize: 17 }}>⚔</span> : <Swords size={17} />}
+                  {hasNemesis ? 'Nemesis!' : `${activeIncursions.length} incursion${activeIncursions.length > 1 ? 's' : ''}`}
+                </div>
+              </HoverTooltip>
+            );
+          })()}
 
           {/* Status effect icons */}
           {statusEffects.length > 0 && (
@@ -296,6 +302,11 @@ export default function GameLayout({ children }: { children: React.ReactNode }) 
         <AboutModal onClose={() => { playSound('uiClose'); setShowAbout(false); }} />
       )}
 
+      {/* ── Chronicle Modal ── */}
+      {showChronicle && (
+        <ChronicleModal onClose={() => { playSound('uiClose'); setShowChronicle(false); }} />
+      )}
+
       {/* ── Game Log ── */}
       <div style={{
         background: '#0D0500',
@@ -303,8 +314,22 @@ export default function GameLayout({ children }: { children: React.ReactNode }) 
         padding: '5px 16px 7px',
         flexShrink: 0,
       }}>
-        <div style={{ color: PARCHMENT, fontSize: 14, fontFamily: '"Cinzel", serif', letterSpacing: 1, marginBottom: 2 }}>
-          CHRONICLE
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+          <div style={{ color: PARCHMENT, fontSize: 14, fontFamily: '"Cinzel", serif', letterSpacing: 1 }}>
+            CHRONICLE
+          </div>
+          <button
+            onClick={() => { playSound('uiOpen'); setShowChronicle(true); }}
+            title="Open Full Chronicle"
+            style={{
+              background: 'none', border: `1px solid ${PARCHMENT}35`,
+              borderRadius: 3, padding: '2px 8px', cursor: 'pointer',
+              color: `${PARCHMENT}99`, fontSize: 13,
+              fontFamily: '"Cinzel", serif', letterSpacing: 0.5,
+            }}
+          >
+            📖 Full Chronicle
+          </button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {gameLog.slice(-3).reverse().map(entry => (

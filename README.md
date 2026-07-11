@@ -349,7 +349,200 @@ Multiple titles can be earned per run; the most recently earned title is shown a
 
 ### Rumours
 
-The Game Hub displays a live **Rumours** panel — context-aware flavour text generated from your current game state. Rumours surface information about active incursions, recent rival property seizures, kobold morale trends, economy highs, and approach of the next season change.
+The Game Hub displays a live **Rumours** panel — context-aware flavour text generated from your current game state. Rumours surface information about active incursions, recent rival property seizures, kobold morale trends, economy highs, and approach of the next season change. The active **Hoard Arrangement** (see below) shifts the flavour of rumours toward wealth, martial dominance, or arcane mystery.
+
+---
+
+## Extended Systems
+
+### Barrax's Loan System
+
+Barrax offers gold loans at the Ironclad Bank. Only one active loan at a time; a new loan cannot be taken while one is outstanding.
+
+| Tier | Borrow | Repay | Window |
+|---|---|---|---|
+| **Small** | 75g | 100g | 8 days |
+| **Medium** | 150g | 210g | 12 days |
+| **Large** | 300g | 450g | 18 days |
+
+Repay from the Bank screen before the deadline. Missing it triggers a **Loan Default**: Barrax files a complaint with the Dragon Council, property purchase prices rise 25% for 10 days (`propertyBuyPriceModifier` status effect), and all rival relationships drop −5.
+
+### Saeloril's Court Cases
+
+Rivals file **Property Disputes** against your owned properties — 10% chance per rival per evening when you own ≥ 3 properties and no dispute is already active. A dispute targets a random owned property and must be resolved at the Arcane Law Office within 5 days.
+
+The case is a 3-round mini-game. Each round, choose one argument:
+
+| Argument | Cost | Outcome |
+|---|---|---|
+| **Strong** | 10g | Always wins the round |
+| **Bluff** | Free | 50% chance to win |
+| **Weak** | Free | Always loses the round |
+
+**Verdict by score (rounds won out of 3):**
+
+| Score | Result |
+|---|---|
+| **3** | Win outright — keep property, +5 dread, rival relationship −15 |
+| **2** | Partial win — keep property, pay 30g legal fees |
+| **1** | Narrow loss — keep property, pay 60g legal fees, rival relationship +5 |
+| **0** | Full loss — property transferred to rival, rival relationship +10 |
+
+Disputes that expire unresolved are treated as a score of 0.
+
+### Rosie's Rumour Betting
+
+Every 5 days, Rosie offers a **"Rumour or Bluff?"** wager in the inn. She shares a rumour that may or may not come true. Pay **15g** to bet on it; if it resolves correctly you earn **45g** back. Bets resolve each evening against one of four types: rival buys a property, a hero incursion spawns, the economy multiplier peaks above 1.2, or a seasonal transition fires.
+
+A countdown shows days until the next wager is available.
+
+### High Roller (Dice Drinking Game)
+
+Once per day at The Ember & Straw Inn, challenge Rosie to a **best-of-3 2d6** game. Choose a wager tier before play begins.
+
+| Tier | Wager | Win Payout |
+|---|---|---|
+| **Copper Round** | 10g | 25g |
+| **Silver Round** | 30g | 75g |
+| **Dragon's Gamble** | 75g | 200g |
+
+Ties go to Rosie (*"House advantage, love"*). Rolling a natural 12 (double 6s) on the Dragon's Gamble tier instantly wins that round and adds +3 dread. The game resets each morning.
+
+### Rival Gift-Giving
+
+From the **Rival** screen, send gold gifts to meaningfully improve a rival's relationship score. Each rival can receive one gift per 5 days. Sending a gift consumes your afternoon action.
+
+| Tier | Cost | Base Relationship Gain |
+|---|---|---|
+| **Trinket** | 20g | +8 |
+| **Curated Hoard Item** | 50g | +18 |
+| **Legendary Offering** | 120g | +30 |
+
+**Dread modifier:** Dread ≥ 60 adds +5 to the gain. Dread < 30 halves the gain and costs −3 dread (the gift is mocked).
+
+### Named Adventurer Nemesis
+
+Defeat the same named hero party **3 times** and their leader becomes your **Nemesis** — a recurring antagonist who spawns as a special incursion every 10–15 days with escalating stats and rewards.
+
+| Nemesis Visit | Stat Multiplier | Reward Multiplier | Special Trait |
+|---|---|---|---|
+| **1st** | ×1.5 | ×2 gold + 2 loot items | — |
+| **2nd** | ×2.0 | ×3 gold + 3 loot items | Vengeance Pact: win grants +5 dread |
+| **3rd+** | ×2.5 | ×4 gold + 4 loot items | Battle-Hardened: combat rolls +4 |
+
+Losing to the nemesis skips the healing fee — they leave a taunting message as a pending event instead. Nemesis incursions display a distinctive ⚔ badge in the top bar.
+
+### Kobold Talent Show
+
+Once every 7 days from the Colony Management screen, hold a **Kobold Talent Show** (requires ≥ 2 kobolds). Three random kobolds perform acts; you judge each round with one of three responses:
+
+| Choice | Effect on Performer | Effect on Others |
+|---|---|---|
+| **Praise** | Morale +15 | All others +5 |
+| **Critique** | Morale −5 | All others +3 (schadenfreude) |
+| **Bribe** | 10g, Morale +25 | All others −3 (jealousy) |
+
+**Show Score** (total morale net-gain):
+- **+30 or more** → Crowd Pleaser: +20g from audience donations.
+- **+15 or more** → Decent Show: +5 dread.
+- **Below +15** → Critical Flop: −3 dread.
+
+### Kobold Promotion Path (Lieutenants)
+
+Kobolds with **30+ days employed** who have already earned their base role trait can be **Promoted** to Lieutenant status.
+
+| Tier | Promotion Cost |
+|---|---|
+| Common | 60g |
+| Uncommon | 100g |
+| Rare | 150g |
+
+**Lieutenant skills (second passive ability by role):**
+
+| Role | Lieutenant Skill |
+|---|---|
+| Miner | **Foreman** — all other miners earn +1g per evening |
+| Guard | **Warden** — auto-raid gold loss reduced an additional −10% |
+| Treasurer | **Chief Ledger** — total kobold income +5% (replaces Sharp Ledger's +3%) |
+| Scout | **Infiltrator** — expedition success chance +10% |
+| Cook | **Head Chef** — all kobolds +3 morale per day (replaces Master Cook's +2) |
+
+Lieutenants display a ⚜️ badge, have loyalty set to 95, and can be **Assigned** to one of three roles for an additional passive bonus: **Lair Defence** (auto-raid damage −15%), **Recruitment** (new kobolds hired start with +10 morale), or **Trade** (auction sell prices +3%).
+
+### Dragon Hoard Showcase
+
+From the **Upgrade Lair** screen, choose one of three **Hoard Arrangements** for your items. Requires at least 3 hoard items. Can be changed at most once every 3 days.
+
+| Arrangement | Passive Bonus |
+|---|---|
+| **Treasure Pile** 💰 | +1 dread per 10 items held (stacks with Trophy Hall) |
+| **Trophy Wall** 🏆 | Each hoard item adds +0.5g to daily kobold income (max +10g) |
+| **Curiosity Cabinet** 🔮 | Auction sell prices +5% |
+
+### Property Auction Bluffing
+
+When a property auction is active, a **Bluff** button appears alongside the normal bid. Choose a declared bid above your actual gold (three options offered: +20g, +40g, or +60g above your current gold). The rival's fold probability = `(relationshipScore / 100) × 0.7` (max 70%).
+
+| Outcome | Result |
+|---|---|
+| **Rival folds** | You win the auction paying only your previous actual bid |
+| **Rival calls — you can cover** | Normal win; you pay the bluffed amount |
+| **Rival calls — you cannot cover** | Bluff Busted: −10g, lose the auction, locked out for 3 days |
+
+Bluffing is available once per auction. The lockout countdown is shown in the auction banner.
+
+### Dragon Council Power Plays
+
+After attending **3 council sessions**, a third option — **Abstain & Propose** — appears during council vote events. Choose one of six player-exclusive motions to put to a vote instead of voting on the current one:
+
+| Motion | Effect if Passed |
+|---|---|
+| **Kobold Labour Reform** 🪖 | Kobold wages frozen for 5 days (no Winter increase) |
+| **Hoard Authenticity Act** 📋 | Auction sell prices +15% for 8 days |
+| **Territorial Boundary Charter** 🗺️ | Rivals cannot buy properties in 2 random districts for 5 days |
+| **Dragon Solidarity Tax** 💰 | Each rival pays you 30g (relationship > 50) or 10g immediately |
+| **Adventurer Amnesty** 🕊️ | No hero incursions for 5 days |
+| **Rival Audit** 🔍 | One random rival loses 20g; all rival-to-rival relationships −5 |
+
+Rivals vote based on relationship score. The motion passes if ≥ 2 of 3 rivals vote Aye.
+
+### Seasonal Dragon Festival
+
+Every **4th season transition** (once per full in-game year, at Day 200, 400, etc.), a **Grand Dragon Festival** fires instead of the normal seasonal event. A 3-day festival window opens with special activities:
+
+1. **Aerial Display** — a new morning action. Prestige combat against a spectral challenger. Win: +10 dread and 50g. Lose: −5 dread. Available once per festival.
+2. **Rival Property Race** — a rival issues a challenge: first to buy a specific open-market property earns +8 dread. The rival has a 30% chance each evening to claim it first.
+3. **Black Market** — gains 2 exclusive festival-only items (ancient relics at elevated base values).
+4. **Festival Bar** — High Roller wager caps are doubled at the inn during the 3 days.
+
+A festival banner is displayed on the Game Hub for the duration.
+
+### Wanted Posters
+
+When your dread reaches **50 or above**, there is a chance the Adventurers' Guild issues a **Wanted Poster** via the random events system. The poster is procedurally generated from your current game state:
+
+- **Bounty**: `dread × 3`g (flavour only — the player does not receive this gold).
+- **Crimes**: 3 selected from a pool based on conditions (kobold count, property count, combat wins, hoard size, dread tier).
+- **Threat classification**: DANGEROUS (50–74) / EXTREMELY DANGEROUS (75–89) / DO NOT APPROACH UNDER ANY CIRCUMSTANCES (90–100).
+
+View the active poster via the **📜 icon** on the Game Hub. Posters expire after 7 days.
+
+### Kobold Mail
+
+When a kobold revolts and leaves, there is a **40% chance** they send a passive-aggressive letter **3–5 days later**. The letter arrives as a pending event modal styled as a letter — salutation, a role-specific body paragraph, and a closing — with no mechanical impact, purely dry comedy. Dismiss it with the **"File Under: Ignored"** button.
+
+Letter body is generated from the kobold's role and days employed at revolt time, and is composed of the kind of petty, specific grievance that is completely correct about everything it is complaining about.
+
+### Full Chronicle
+
+The bottom chronicle bar has a **📖 Full Chronicle** button. Clicking it opens a full-screen log viewer showing the complete run history with filtering controls:
+
+- **Day range filter** — from/to day inputs.
+- **Category filter** — toggleable chips for each log category, each colour-coded: `combat` (red), `economy` (gold), `kobold` (green), `rival` (purple), `event` (blue), `property` (orange), `system` (grey).
+- **Search** — case-insensitive substring filter on message text.
+- **Entry count** — shows how many entries match current filters.
+
+Entries are grouped by day in reverse-chronological order. The stored log is capped at the 500 most recent entries to prevent save bloat.
 
 ---
 
